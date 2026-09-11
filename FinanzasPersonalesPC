@@ -18,6 +18,17 @@
   .mb-1\.5{margin-bottom:.375rem}
   .uppercase{text-transform:uppercase}
   .tracking-wide{letter-spacing:.025em}
+  .gap-x-6{column-gap:1.5rem}
+  .gap-y-3{row-gap:.75rem}
+  .text-navy-a{color:#2563eb}
+  .text-navy-b{color:#1d4ed8}
+  .text-navy-c{color:#1e3a8a}
+  .text-navy-d{color:#0a1330}
+  .border-t-navy-a{border-top-color:#2563eb}
+  .border-t-navy-b{border-top-color:#1d4ed8}
+  .border-t-navy-c{border-top-color:#1e3a8a}
+  .border-t-navy-d{border-top-color:#0a1330}
+  .dark .text-navy-a,.dark .text-navy-b,.dark .text-navy-c,.dark .text-navy-d{color:#60a5fa}
 </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-900">
@@ -755,13 +766,15 @@ const Filters = ({
     method: ""
   });
   const chip = active => "px-2.5 py-1 rounded-full border text-xs font-medium transition-colors " + (active ? "bg-blue-700 border-blue-700 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700");
-  const group = (label, children) => /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5"
+  const group = (label, children) => /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500"
   }, label), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap gap-1.5"
   }, children));
   return /*#__PURE__*/React.createElement("div", {
-    className: "space-y-4"
+    className: "flex flex-wrap items-center gap-x-6 gap-y-3"
   }, group("Año", years.map(y => /*#__PURE__*/React.createElement("button", {
     key: y,
     type: "button",
@@ -801,7 +814,7 @@ const Filters = ({
   }, mm))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: clear,
-    className: "flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 pt-1"
+    className: "flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400"
   }, /*#__PURE__*/React.createElement(Icon, {
     path: I.x,
     size: 14
@@ -875,6 +888,11 @@ const Dashboard = ({
     method: ""
   });
   const [cur, setCur] = useState("PEN");
+  const [methodEntity, setMethodEntity] = useState("");
+  const [tsort, setTsort] = useState({
+    key: "date",
+    dir: "desc"
+  });
   const rows = useMemo(() => applyFilters(movements, f), [movements, f]);
   const pen = useMemo(() => totalsByType(rows, "PEN"), [rows]);
   const usd = useMemo(() => totalsByType(rows, "USD"), [rows]);
@@ -890,20 +908,12 @@ const Dashboard = ({
       value
     })).sort((a, b) => b.value - a.value);
   }, [rows, cur]);
-  const byEntity = useMemo(() => {
-    const map = {};
-    expenses.forEach(m => {
-      const v = amt(m, cur);
-      if (v > 0 && m.financialEntity) map[m.financialEntity] = (map[m.financialEntity] || 0) + v;
-    });
-    return Object.entries(map).map(([name, value]) => ({
-      name,
-      value
-    })).sort((a, b) => b.value - a.value);
-  }, [rows, cur]);
+  const totalCat = byCat.reduce((s, c) => s + c.value, 0);
+  const methodEntities = useMemo(() => Array.from(new Set(expenses.map(m => m.financialEntity).filter(Boolean))).sort(), [expenses]);
   const byMethod = useMemo(() => {
+    const list = methodEntity ? expenses.filter(m => m.financialEntity === methodEntity) : expenses;
     const map = {};
-    expenses.forEach(m => {
+    list.forEach(m => {
       const v = amt(m, cur);
       if (v > 0 && m.paymentMethod) map[m.paymentMethod] = (map[m.paymentMethod] || 0) + v;
     });
@@ -911,38 +921,45 @@ const Dashboard = ({
       name,
       value
     })).sort((a, b) => b.value - a.value);
-  }, [rows, cur]);
-  const monthly = useMemo(() => {
-    const map = {};
-    rows.forEach(m => {
-      const k = m.date.slice(0, 7);
-      if (!map[k]) map[k] = {
-        key: k,
-        label: MONTHS[+monthOf(m.date) - 1].slice(0, 3) + " " + yearOf(m.date),
-        Ingresos: 0,
-        Gastos: 0,
-        Ahorros: 0
-      };
-      const v = amt(m, cur);
-      if (m.type === "Ingreso") map[k].Ingresos += v;else if (m.type === "Gasto") map[k].Gastos += v;else if (m.type === "Ahorro") map[k].Ahorros += v;
-    });
-    return Object.values(map).sort((a, b) => a.key.localeCompare(b.key));
-  }, [rows, cur]);
-  const comparison = [{
-    name: "Ingresos",
-    value: (cur === "PEN" ? pen : usd).Ingreso,
-    fill: TYPE_META.Ingreso.color
-  }, {
-    name: "Gastos",
-    value: (cur === "PEN" ? pen : usd).Gasto,
-    fill: TYPE_META.Gasto.color
-  }, {
-    name: "Ahorros",
-    value: (cur === "PEN" ? pen : usd).Ahorro,
-    fill: TYPE_META.Ahorro.color
-  }];
+  }, [expenses, cur, methodEntity]);
   const tickFmt = v => fmtMoney(v, cur);
   const hasExpenses = byCat.length > 0;
+  const numKeys = {
+    amountPEN: true,
+    amountUSD: true
+  };
+  const sortedRows = useMemo(() => {
+    const dir = tsort.dir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const k = tsort.key;
+      if (numKeys[k]) return ((a[k] || 0) - (b[k] || 0)) * dir;
+      return String(a[k]).localeCompare(String(b[k])) * dir;
+    });
+  }, [rows, tsort]);
+  const toggleSort = key => setTsort(s => ({
+    key,
+    dir: s.key === key && s.dir === "desc" ? "asc" : "desc"
+  }));
+  const Th = ({
+    label,
+    k,
+    right
+  }) => /*#__PURE__*/React.createElement("th", {
+    className: "p-2 cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200" + (right ? " text-right" : ""),
+    onClick: () => toggleSort(k)
+  }, label, " ", tsort.key === k ? tsort.dir === "asc" ? "▲" : "▼" : "");
+  const entityFilterExtra = /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-1.5"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setMethodEntity(""),
+    className: "px-2 py-1 rounded-full border text-xs font-medium " + (methodEntity === "" ? "bg-blue-700 border-blue-700 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700")
+  }, "Todas"), methodEntities.map(en => /*#__PURE__*/React.createElement("button", {
+    key: en,
+    type: "button",
+    onClick: () => setMethodEntity(en),
+    className: "px-2 py-1 rounded-full border text-xs font-medium " + (methodEntity === en ? "bg-blue-700 border-blue-700 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700")
+  }, en)));
   return /*#__PURE__*/React.createElement("div", {
     className: "space-y-4"
   }, /*#__PURE__*/React.createElement(Card, {
@@ -954,157 +971,75 @@ const Dashboard = ({
   }, "Dashboard"), /*#__PURE__*/React.createElement(CurrencyToggle, {
     cur: cur,
     setCur: setCur
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-col md:flex-row gap-4"
-  }, /*#__PURE__*/React.createElement("aside", {
-    className: "md:w-56 shrink-0"
-  }, /*#__PURE__*/React.createElement(Card, {
-    className: "p-4 md:sticky md:top-4"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3"
-  }, "Filtros"), /*#__PURE__*/React.createElement(Filters, {
+  }))), /*#__PURE__*/React.createElement(Card, {
+    className: "p-4"
+  }, /*#__PURE__*/React.createElement(Filters, {
     movements: movements,
     f: f,
     setF: setF
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 min-w-0 space-y-4"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-3 gap-3"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 lg:grid-cols-4 gap-3"
   }, /*#__PURE__*/React.createElement(KpiCard, {
     title: "Ingresos",
     pen: pen.Ingreso,
     usd: usd.Ingreso,
-    colorText: TYPE_META.Ingreso.text,
+    colorText: "text-navy-a dark:text-blue-400",
     icon: I.up,
-    accent: "border-t-emerald-500"
+    accent: "border-t-navy-a"
   }), /*#__PURE__*/React.createElement(KpiCard, {
     title: "Gastos",
     pen: pen.Gasto,
     usd: usd.Gasto,
-    colorText: TYPE_META.Gasto.text,
+    colorText: "text-navy-b dark:text-blue-400",
     icon: I.down,
-    accent: "border-t-red-500"
+    accent: "border-t-navy-b"
   }), /*#__PURE__*/React.createElement(KpiCard, {
     title: "Ahorros",
     pen: pen.Ahorro,
     usd: usd.Ahorro,
-    colorText: TYPE_META.Ahorro.text,
+    colorText: "text-navy-c dark:text-blue-400",
     icon: I.wallet,
-    accent: "border-t-violet-500"
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-2 lg:grid-cols-3 gap-3"
-  }, /*#__PURE__*/React.createElement(Card, {
-    className: "p-4 border-t-4 border-t-blue-700"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm text-slate-500 dark:text-slate-400"
-  }, "Balance disponible"), /*#__PURE__*/React.createElement("span", {
-    className: "text-emerald-600"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    path: I.wallet,
-    size: 18
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-2 text-lg font-bold " + (pen.balance >= 0 ? "text-emerald-600" : "text-red-500")
-  }, fmtMoney(pen.balance, "PEN")), /*#__PURE__*/React.createElement("div", {
-    className: "text-sm font-semibold " + (usd.balance >= 0 ? "text-emerald-500" : "text-red-400")
-  }, fmtMoney(usd.balance, "USD"))), /*#__PURE__*/React.createElement(Card, {
-    className: "p-4 border-t-4 border-t-violet-500"
+    accent: "border-t-navy-c"
+  }), /*#__PURE__*/React.createElement(Card, {
+    className: "p-4 border-t-4 border-t-navy-d"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm text-slate-500 dark:text-slate-400"
   }, "Porcentaje de ahorro"), /*#__PURE__*/React.createElement("span", {
-    className: "text-violet-500"
+    className: "text-navy-d dark:text-blue-400"
   }, /*#__PURE__*/React.createElement(Icon, {
     path: I.percent,
     size: 18
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-2 text-lg font-bold text-violet-600"
+    className: "mt-2 text-lg font-bold text-navy-d dark:text-blue-400"
   }, pen.savingsPct == null ? "Sin base" : pen.savingsPct.toFixed(1) + " %", " ", /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-normal text-slate-400"
   }, "S/")), /*#__PURE__*/React.createElement("div", {
-    className: "text-sm font-semibold text-violet-500"
+    className: "text-sm font-semibold text-navy-d dark:text-blue-400"
   }, usd.savingsPct == null ? "Sin base" : usd.savingsPct.toFixed(1) + " %", " ", /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-normal text-slate-400"
-  }, "US$"))), /*#__PURE__*/React.createElement(Card, {
-    className: "p-4 border-t-4 border-t-blue-700"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm text-slate-500 dark:text-slate-400"
-  }, "Cantidad de movimientos"), /*#__PURE__*/React.createElement("span", {
-    className: "text-blue-700 dark:text-blue-400"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    path: I.list,
-    size: 18
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-2 text-2xl font-bold text-slate-800 dark:text-slate-100"
-  }, rows.length))), /*#__PURE__*/React.createElement("div", {
+  }, "US$")))), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-1 lg:grid-cols-2 gap-3"
   }, /*#__PURE__*/React.createElement(ChartBox, {
-    title: "Gastos por categoría (" + (cur === "PEN" ? "Soles" : "Dólares") + ")"
-  }, hasExpenses ? /*#__PURE__*/React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: 280
-  }, /*#__PURE__*/React.createElement(BarChart, {
-    data: byCat,
-    margin: {
-      left: 4,
-      right: 8,
-      bottom: 40
-    }
-  }, /*#__PURE__*/React.createElement(CartesianGrid, {
-    strokeDasharray: "3 3",
-    stroke: "#94a3b8",
-    opacity: 0.2
-  }), /*#__PURE__*/React.createElement(XAxis, {
-    dataKey: "name",
-    angle: -30,
-    textAnchor: "end",
-    interval: 0,
-    height: 70,
-    tick: {
-      fontSize: 10,
-      fill: "#94a3b8"
-    }
-  }), /*#__PURE__*/React.createElement(YAxis, {
-    tick: {
-      fontSize: 10,
-      fill: "#94a3b8"
-    },
-    width: 70,
-    tickFormatter: tickFmt
-  }), /*#__PURE__*/React.createElement(Tooltip, {
-    formatter: v => fmtMoney(v, cur)
-  }), /*#__PURE__*/React.createElement(Bar, {
-    dataKey: "value",
-    name: "Gasto",
-    radius: [4, 4, 0, 0]
-  }, byCat.map((_, i) => /*#__PURE__*/React.createElement(Cell, {
-    key: i,
-    fill: CAT_COLORS[i % CAT_COLORS.length]
-  }))))) : /*#__PURE__*/React.createElement(Empty, {
-    msg: "Sin datos de gastos para los filtros actuales"
-  })), /*#__PURE__*/React.createElement(ChartBox, {
     title: "Distribución de gastos por categoría"
   }, hasExpenses ? /*#__PURE__*/React.createElement(ResponsiveContainer, {
     width: "100%",
-    height: 280
+    height: 320
   }, /*#__PURE__*/React.createElement(PieChart, null, /*#__PURE__*/React.createElement(Pie, {
     data: byCat,
     dataKey: "value",
     nameKey: "name",
     cx: "50%",
     cy: "50%",
-    innerRadius: 55,
-    outerRadius: 95,
+    innerRadius: 60,
+    outerRadius: 110,
     label: e => (e.percent * 100).toFixed(0) + "%"
   }, byCat.map((_, i) => /*#__PURE__*/React.createElement(Cell, {
     key: i,
     fill: CAT_COLORS[i % CAT_COLORS.length]
   }))), /*#__PURE__*/React.createElement(Tooltip, {
-    formatter: v => fmtMoney(v, cur)
+    formatter: (value, name) => [fmtMoney(value, cur) + (totalCat ? " · " + (value / totalCat * 100).toFixed(1) + "%" : ""), name]
   }), /*#__PURE__*/React.createElement(Legend, {
     wrapperStyle: {
       fontSize: 11
@@ -1112,140 +1047,11 @@ const Dashboard = ({
   }))) : /*#__PURE__*/React.createElement(Empty, {
     msg: "Sin datos de gastos"
   })), /*#__PURE__*/React.createElement(ChartBox, {
-    title: "Evolución mensual (ingresos, gastos y ahorros)"
-  }, monthly.length ? /*#__PURE__*/React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: 280
-  }, /*#__PURE__*/React.createElement(LineChart, {
-    data: monthly,
-    margin: {
-      left: 4,
-      right: 8,
-      bottom: 10
-    }
-  }, /*#__PURE__*/React.createElement(CartesianGrid, {
-    strokeDasharray: "3 3",
-    stroke: "#94a3b8",
-    opacity: 0.2
-  }), /*#__PURE__*/React.createElement(XAxis, {
-    dataKey: "label",
-    tick: {
-      fontSize: 10,
-      fill: "#94a3b8"
-    }
-  }), /*#__PURE__*/React.createElement(YAxis, {
-    tick: {
-      fontSize: 10,
-      fill: "#94a3b8"
-    },
-    width: 70,
-    tickFormatter: tickFmt
-  }), /*#__PURE__*/React.createElement(Tooltip, {
-    formatter: v => fmtMoney(v, cur)
-  }), /*#__PURE__*/React.createElement(Legend, {
-    wrapperStyle: {
-      fontSize: 11
-    }
-  }), /*#__PURE__*/React.createElement(Line, {
-    type: "monotone",
-    dataKey: "Ingresos",
-    stroke: TYPE_META.Ingreso.color,
-    strokeWidth: 2
-  }), /*#__PURE__*/React.createElement(Line, {
-    type: "monotone",
-    dataKey: "Gastos",
-    stroke: TYPE_META.Gasto.color,
-    strokeWidth: 2
-  }), /*#__PURE__*/React.createElement(Line, {
-    type: "monotone",
-    dataKey: "Ahorros",
-    stroke: TYPE_META.Ahorro.color,
-    strokeWidth: 2
-  }))) : /*#__PURE__*/React.createElement(Empty, {
-    msg: "Sin datos para el periodo"
-  })), /*#__PURE__*/React.createElement(ChartBox, {
-    title: "Comparación de operaciones"
-  }, rows.length ? /*#__PURE__*/React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: 280
-  }, /*#__PURE__*/React.createElement(BarChart, {
-    data: comparison,
-    margin: {
-      left: 4,
-      right: 8,
-      bottom: 10
-    }
-  }, /*#__PURE__*/React.createElement(CartesianGrid, {
-    strokeDasharray: "3 3",
-    stroke: "#94a3b8",
-    opacity: 0.2
-  }), /*#__PURE__*/React.createElement(XAxis, {
-    dataKey: "name",
-    tick: {
-      fontSize: 11,
-      fill: "#94a3b8"
-    }
-  }), /*#__PURE__*/React.createElement(YAxis, {
-    tick: {
-      fontSize: 10,
-      fill: "#94a3b8"
-    },
-    width: 70,
-    tickFormatter: tickFmt
-  }), /*#__PURE__*/React.createElement(Tooltip, {
-    formatter: v => fmtMoney(v, cur)
-  }), /*#__PURE__*/React.createElement(Bar, {
-    dataKey: "value",
-    name: "Monto",
-    radius: [4, 4, 0, 0]
-  }, comparison.map((c, i) => /*#__PURE__*/React.createElement(Cell, {
-    key: i,
-    fill: c.fill
-  }))))) : /*#__PURE__*/React.createElement(Empty, {
-    msg: "Sin datos para el periodo"
-  })), /*#__PURE__*/React.createElement(ChartBox, {
-    title: "Gastos por entidad financiera"
-  }, byEntity.length ? /*#__PURE__*/React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: 260
-  }, /*#__PURE__*/React.createElement(BarChart, {
-    data: byEntity,
-    margin: {
-      left: 4,
-      right: 8,
-      bottom: 10
-    }
-  }, /*#__PURE__*/React.createElement(CartesianGrid, {
-    strokeDasharray: "3 3",
-    stroke: "#94a3b8",
-    opacity: 0.2
-  }), /*#__PURE__*/React.createElement(XAxis, {
-    dataKey: "name",
-    tick: {
-      fontSize: 11,
-      fill: "#94a3b8"
-    }
-  }), /*#__PURE__*/React.createElement(YAxis, {
-    tick: {
-      fontSize: 10,
-      fill: "#94a3b8"
-    },
-    width: 70,
-    tickFormatter: tickFmt
-  }), /*#__PURE__*/React.createElement(Tooltip, {
-    formatter: v => fmtMoney(v, cur)
-  }), /*#__PURE__*/React.createElement(Bar, {
-    dataKey: "value",
-    name: "Gasto",
-    fill: "#1d4ed8",
-    radius: [4, 4, 0, 0]
-  }))) : /*#__PURE__*/React.createElement(Empty, {
-    msg: "Sin datos de gastos por entidad"
-  })), /*#__PURE__*/React.createElement(ChartBox, {
-    title: "Gastos por método de pago"
+    title: "Gastos por método de pago",
+    extra: entityFilterExtra
   }, byMethod.length ? /*#__PURE__*/React.createElement(ResponsiveContainer, {
     width: "100%",
-    height: 260
+    height: 320
   }, /*#__PURE__*/React.createElement(BarChart, {
     layout: "vertical",
     data: byMethod,
@@ -1278,7 +1084,7 @@ const Dashboard = ({
   }), /*#__PURE__*/React.createElement(Bar, {
     dataKey: "value",
     name: "Gasto",
-    fill: "#0ea5e9",
+    fill: "#1d4ed8",
     radius: [0, 4, 4, 0]
   }))) : /*#__PURE__*/React.createElement(Empty, {
     msg: "Sin datos de gastos por método"
@@ -1296,19 +1102,27 @@ const Dashboard = ({
     className: "sticky top-0 bg-white dark:bg-slate-800"
   }, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700"
-  }, /*#__PURE__*/React.createElement("th", {
-    className: "p-2"
-  }, "Fecha"), /*#__PURE__*/React.createElement("th", {
-    className: "p-2"
-  }, "Tipo"), /*#__PURE__*/React.createElement("th", {
-    className: "p-2"
-  }, "Nombre"), /*#__PURE__*/React.createElement("th", {
-    className: "p-2"
-  }, "Categoría"), /*#__PURE__*/React.createElement("th", {
-    className: "p-2 text-right"
-  }, "S/"), /*#__PURE__*/React.createElement("th", {
-    className: "p-2 text-right"
-  }, "US$"))), /*#__PURE__*/React.createElement("tbody", null, [...rows].sort((a, b) => b.date.localeCompare(a.date)).map(m => /*#__PURE__*/React.createElement("tr", {
+  }, /*#__PURE__*/React.createElement(Th, {
+    label: "Fecha",
+    k: "date"
+  }), /*#__PURE__*/React.createElement(Th, {
+    label: "Tipo",
+    k: "type"
+  }), /*#__PURE__*/React.createElement(Th, {
+    label: "Nombre",
+    k: "name"
+  }), /*#__PURE__*/React.createElement(Th, {
+    label: "Categoría",
+    k: "category"
+  }), /*#__PURE__*/React.createElement(Th, {
+    label: "S/",
+    k: "amountPEN",
+    right: true
+  }), /*#__PURE__*/React.createElement(Th, {
+    label: "US$",
+    k: "amountUSD",
+    right: true
+  }))), /*#__PURE__*/React.createElement("tbody", null, sortedRows.map(m => /*#__PURE__*/React.createElement("tr", {
     key: m.id,
     className: "border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30"
   }, /*#__PURE__*/React.createElement("td", {
@@ -1323,10 +1137,11 @@ const Dashboard = ({
     className: "p-2 text-slate-600 dark:text-slate-300"
   }, m.category), /*#__PURE__*/React.createElement("td", {
     className: "p-2 text-right text-slate-700 dark:text-slate-200"
-  }, m.amountPEN ? fmtMoney(m.amountPEN, "PEN") : "\u2014"), /*#__PURE__*/React.createElement("td", {
+  }, m.amountPEN ? fmtMoney(m.amountPEN, "PEN") : "—"), /*#__PURE__*/React.createElement("td", {
     className: "p-2 text-right text-slate-700 dark:text-slate-200"
-  }, m.amountUSD ? fmtMoney(m.amountUSD, "USD") : "\u2014"))))))))));
+  }, m.amountUSD ? fmtMoney(m.amountUSD, "USD") : "—"))))))));
 };
+
 
 /* ============================ Formulario ============================ */
 const emptyForm = {
@@ -1607,20 +1422,14 @@ const History = ({
   const cur = filtered.slice((page - 1) * pageSize, page * pageSize);
   const sel = "px-2 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600";
   return /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-col md:flex-row gap-4"
-  }, /*#__PURE__*/React.createElement("aside", {
-    className: "md:w-56 shrink-0"
+    className: "space-y-4"
   }, /*#__PURE__*/React.createElement(Card, {
-    className: "p-4 md:sticky md:top-4"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3"
-  }, "Filtros"), /*#__PURE__*/React.createElement(Filters, {
+    className: "p-4"
+  }, /*#__PURE__*/React.createElement(Filters, {
     movements: movements,
     f: f,
     setF: setF
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 min-w-0 space-y-4"
-  }, /*#__PURE__*/React.createElement(Card, {
+  })), /*#__PURE__*/React.createElement(Card, {
     className: "p-4"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "text-lg font-bold text-slate-800 dark:text-slate-100 mb-3"
@@ -1790,7 +1599,7 @@ const History = ({
     disabled: page >= pages,
     onClick: () => setPage(p => p + 1),
     className: "px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-40 text-slate-700 dark:text-slate-200"
-  }, "Siguiente")))))));
+  }, "Siguiente"))))));
 };
 
 /* ============================ Análisis por categorías ============================ */
@@ -2590,20 +2399,14 @@ const HistoryBase = ({
   const cur = filtered.slice((page - 1) * pageSize, page * pageSize);
   const sel = "px-2 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600";
   return /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-col md:flex-row gap-4"
-  }, /*#__PURE__*/React.createElement("aside", {
-    className: "md:w-56 shrink-0"
+    className: "space-y-4"
   }, /*#__PURE__*/React.createElement(Card, {
-    className: "p-4 md:sticky md:top-4"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3"
-  }, "Filtros"), /*#__PURE__*/React.createElement(Filters, {
+    className: "p-4"
+  }, /*#__PURE__*/React.createElement(Filters, {
     movements: movements,
     f: f,
     setF: setF
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 min-w-0 space-y-4"
-  }, /*#__PURE__*/React.createElement(Card, {
+  })), /*#__PURE__*/React.createElement(Card, {
     className: "p-4"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "text-lg font-bold text-slate-800 dark:text-slate-100 mb-3"
@@ -2773,7 +2576,7 @@ const HistoryBase = ({
     disabled: page >= pages,
     onClick: () => setPage(p => p + 1),
     className: "px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-40 text-slate-700 dark:text-slate-200"
-  }, "Siguiente")))))));
+  }, "Siguiente"))))));
 };
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));</script>
 </body>
