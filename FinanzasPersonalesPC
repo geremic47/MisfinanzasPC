@@ -12,6 +12,12 @@
   ::-webkit-scrollbar{height:8px;width:8px;}
   ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:8px;}
   .dark ::-webkit-scrollbar-thumb{background:#475569;}
+  .px-2\.5{padding-left:.625rem;padding-right:.625rem}
+  .py-1{padding-top:.25rem;padding-bottom:.25rem}
+  .gap-1\.5{gap:.375rem}
+  .mb-1\.5{margin-bottom:.375rem}
+  .uppercase{text-transform:uppercase}
+  .tracking-wide{letter-spacing:.025em}
 </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-900">
@@ -735,12 +741,11 @@ const Filters = ({
   setF
 }) => {
   const years = useMemo(() => Array.from(new Set(movements.map(m => yearOf(m.date)))).sort().reverse(), [movements]);
-  const set = (k, v) => setF({
-    ...f,
-    [k]: v
-  });
-  const catOptions = f.type ? categoriesForType(f.type) : [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
   const methodOptions = f.entity ? ENTITIES[f.entity] : [];
+  const toggle = (k, v) => setF({
+    ...f,
+    [k]: f[k] === v ? "" : v
+  });
   const clear = () => setF({
     year: "",
     month: "",
@@ -749,75 +754,54 @@ const Filters = ({
     entity: "",
     method: ""
   });
-  const sel = "px-2 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600";
+  const chip = active => "px-2.5 py-1 rounded-full border text-xs font-medium transition-colors " + (active ? "bg-blue-700 border-blue-700 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700");
+  const group = (label, children) => /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5"
+  }, label), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-1.5"
+  }, children));
   return /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap gap-2 items-center"
-  }, /*#__PURE__*/React.createElement("select", {
-    className: sel,
-    value: f.year,
-    onChange: e => set("year", e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Todos los años"), years.map(y => /*#__PURE__*/React.createElement("option", {
+    className: "space-y-4"
+  }, group("Año", years.map(y => /*#__PURE__*/React.createElement("button", {
     key: y,
-    value: y
-  }, y))), /*#__PURE__*/React.createElement("select", {
-    className: sel,
-    value: f.month,
-    onChange: e => set("month", e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Todos los meses"), MONTHS.map((m, i) => /*#__PURE__*/React.createElement("option", {
-    key: i,
-    value: String(i + 1).padStart(2, "0")
-  }, m))), /*#__PURE__*/React.createElement("select", {
-    className: sel,
-    value: f.type,
-    onChange: e => setF({
-      ...f,
-      type: e.target.value,
-      category: ""
-    })
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Todos los tipos"), Object.keys(TYPE_META).map(t => /*#__PURE__*/React.createElement("option", {
+    type: "button",
+    onClick: () => toggle("year", y),
+    className: chip(f.year === y)
+  }, y))), group("Mes", MONTHS.map((m, i) => {
+    const v = String(i + 1).padStart(2, "0");
+    return /*#__PURE__*/React.createElement("button", {
+      key: v,
+      type: "button",
+      onClick: () => toggle("month", v),
+      className: chip(f.month === v)
+    }, m.slice(0, 3));
+  })), group("Tipo", Object.keys(TYPE_META).map(t => /*#__PURE__*/React.createElement("button", {
     key: t,
-    value: t
-  }, t))), /*#__PURE__*/React.createElement("select", {
-    className: sel,
-    value: f.category,
-    onChange: e => set("category", e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Todas las categorías"), catOptions.map(c => /*#__PURE__*/React.createElement("option", {
-    key: c,
-    value: c
-  }, c))), /*#__PURE__*/React.createElement("select", {
-    className: sel,
-    value: f.entity,
-    onChange: e => setF({
+    type: "button",
+    onClick: () => setF({
       ...f,
-      entity: e.target.value,
-      method: ""
-    })
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Todas las entidades"), ENTITY_NAMES.map(en => /*#__PURE__*/React.createElement("option", {
+      type: f.type === t ? "" : t,
+      category: ""
+    }),
+    className: chip(f.type === t)
+  }, t))), group("Entidad", ENTITY_NAMES.map(en => /*#__PURE__*/React.createElement("button", {
     key: en,
-    value: en
-  }, en))), /*#__PURE__*/React.createElement("select", {
-    className: sel,
-    value: f.method,
-    onChange: e => set("method", e.target.value),
-    disabled: !f.entity
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Todos los métodos"), methodOptions.map(mm => /*#__PURE__*/React.createElement("option", {
+    type: "button",
+    onClick: () => setF({
+      ...f,
+      entity: f.entity === en ? "" : en,
+      method: ""
+    }),
+    className: chip(f.entity === en)
+  }, en))), f.entity && group("Método", methodOptions.map(mm => /*#__PURE__*/React.createElement("button", {
     key: mm,
-    value: mm
+    type: "button",
+    onClick: () => toggle("method", mm),
+    className: chip(f.method === mm)
   }, mm))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: clear,
-    className: "flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
+    className: "flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 pt-1"
   }, /*#__PURE__*/React.createElement(Icon, {
     path: I.x,
     size: 14
@@ -970,13 +954,21 @@ const Dashboard = ({
   }, "Dashboard"), /*#__PURE__*/React.createElement(CurrencyToggle, {
     cur: cur,
     setCur: setCur
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "mt-3"
-  }, /*#__PURE__*/React.createElement(Filters, {
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col md:flex-row gap-4"
+  }, /*#__PURE__*/React.createElement("aside", {
+    className: "md:w-56 shrink-0"
+  }, /*#__PURE__*/React.createElement(Card, {
+    className: "p-4 md:sticky md:top-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3"
+  }, "Filtros"), /*#__PURE__*/React.createElement(Filters, {
     movements: movements,
     f: f,
     setF: setF
   }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-0 space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-3 gap-3"
   }, /*#__PURE__*/React.createElement(KpiCard, {
     title: "Ingresos",
@@ -1333,7 +1325,7 @@ const Dashboard = ({
     className: "p-2 text-right text-slate-700 dark:text-slate-200"
   }, m.amountPEN ? fmtMoney(m.amountPEN, "PEN") : "\u2014"), /*#__PURE__*/React.createElement("td", {
     className: "p-2 text-right text-slate-700 dark:text-slate-200"
-  }, m.amountUSD ? fmtMoney(m.amountUSD, "USD") : "\u2014"))))))));
+  }, m.amountUSD ? fmtMoney(m.amountUSD, "USD") : "\u2014"))))))))));
 };
 
 /* ============================ Formulario ============================ */
@@ -1615,7 +1607,19 @@ const History = ({
   const cur = filtered.slice((page - 1) * pageSize, page * pageSize);
   const sel = "px-2 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600";
   return /*#__PURE__*/React.createElement("div", {
-    className: "space-y-4"
+    className: "flex flex-col md:flex-row gap-4"
+  }, /*#__PURE__*/React.createElement("aside", {
+    className: "md:w-56 shrink-0"
+  }, /*#__PURE__*/React.createElement(Card, {
+    className: "p-4 md:sticky md:top-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3"
+  }, "Filtros"), /*#__PURE__*/React.createElement(Filters, {
+    movements: movements,
+    f: f,
+    setF: setF
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-0 space-y-4"
   }, /*#__PURE__*/React.createElement(Card, {
     className: "p-4"
   }, /*#__PURE__*/React.createElement("h2", {
@@ -1632,11 +1636,7 @@ const History = ({
     placeholder: "Buscar por nombre u observaciones...",
     value: q,
     onChange: e => setQ(e.target.value)
-  })), /*#__PURE__*/React.createElement(Filters, {
-    movements: movements,
-    f: f,
-    setF: setF
-  }), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center gap-2 mt-3"
   }, /*#__PURE__*/React.createElement("select", {
     className: sel,
@@ -1790,7 +1790,7 @@ const History = ({
     disabled: page >= pages,
     onClick: () => setPage(p => p + 1),
     className: "px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-40 text-slate-700 dark:text-slate-200"
-  }, "Siguiente"))))));
+  }, "Siguiente")))))));
 };
 
 /* ============================ Análisis por categorías ============================ */
@@ -2590,7 +2590,19 @@ const HistoryBase = ({
   const cur = filtered.slice((page - 1) * pageSize, page * pageSize);
   const sel = "px-2 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600";
   return /*#__PURE__*/React.createElement("div", {
-    className: "space-y-4"
+    className: "flex flex-col md:flex-row gap-4"
+  }, /*#__PURE__*/React.createElement("aside", {
+    className: "md:w-56 shrink-0"
+  }, /*#__PURE__*/React.createElement(Card, {
+    className: "p-4 md:sticky md:top-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3"
+  }, "Filtros"), /*#__PURE__*/React.createElement(Filters, {
+    movements: movements,
+    f: f,
+    setF: setF
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-0 space-y-4"
   }, /*#__PURE__*/React.createElement(Card, {
     className: "p-4"
   }, /*#__PURE__*/React.createElement("h2", {
@@ -2607,11 +2619,7 @@ const HistoryBase = ({
     placeholder: "Buscar por nombre u observaciones...",
     value: q,
     onChange: e => setQ(e.target.value)
-  })), /*#__PURE__*/React.createElement(Filters, {
-    movements: movements,
-    f: f,
-    setF: setF
-  }), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center gap-2 mt-3"
   }, /*#__PURE__*/React.createElement("select", {
     className: sel,
@@ -2765,7 +2773,7 @@ const HistoryBase = ({
     disabled: page >= pages,
     onClick: () => setPage(p => p + 1),
     className: "px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-40 text-slate-700 dark:text-slate-200"
-  }, "Siguiente"))))));
+  }, "Siguiente")))))));
 };
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));</script>
 </body>
