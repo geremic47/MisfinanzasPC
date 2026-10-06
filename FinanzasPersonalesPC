@@ -81,6 +81,7 @@ window.addEventListener('error',function(e){
 <script src="https://cdn.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" crossorigin="anonymous"></script>
 <script>(function(){ if(!window.React||!window.ReactDOM||!window.Recharts){ throw new Error('No se cargaron las librerias desde el CDN. Revisa tu conexion a internet.'); } })();</script>
 <script>const {
   useState,
@@ -110,6 +111,52 @@ const {
 
 /* ============================ Constantes ============================ */
 const STORE_KEY = "mis-finanzas:v1";
+/* Supabase: la clave "anon" es publica por diseno; los datos los protege RLS (solo el usuario autenticado accede a sus filas). */
+const SUPABASE_URL = "https://oaevtwjjgtysuodxbwlp.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hZXZ0d2pqZ3R5c3VvZHhid2xwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMzY1NjMsImV4cCI6MjEwNjgxMjU2M30.OxC1t7n6g0qltUK3boYlbXHUEmZVYpdWeA_FEPRG1xk";
+const toRow = m => ({
+  id: m.id,
+  date: m.date,
+  type: m.type,
+  name: m.name,
+  amount_pen: Number(m.amountPEN) || 0,
+  amount_usd: Number(m.amountUSD) || 0,
+  category: m.category,
+  financial_entity: m.financialEntity || "",
+  payment_method: m.paymentMethod || "",
+  notes: m.notes || "",
+  created_at: m.createdAt || new Date().toISOString(),
+  updated_at: m.updatedAt || new Date().toISOString()
+});
+const fromRow = r => ({
+  id: r.id,
+  date: r.date,
+  type: r.type,
+  name: r.name,
+  amountPEN: Number(r.amount_pen) || 0,
+  amountUSD: Number(r.amount_usd) || 0,
+  category: r.category,
+  financialEntity: r.financial_entity || "",
+  paymentMethod: r.payment_method || "",
+  notes: r.notes || "",
+  createdAt: r.created_at,
+  updatedAt: r.updated_at
+});
+const fetchAllMovements = async sb => {
+  const out = [];
+  for (let from = 0;; from += 1000) {
+    const {
+      data,
+      error
+    } = await sb.from("movements").select("*").order("created_at", {
+      ascending: false
+    }).range(from, from + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  return out.map(fromRow);
+};
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const EXPENSE_CATEGORIES = ["Transporte", "Alimentación", "Ropa, calzado y accesorios", "Cuidado personal", "Tecnología, servicios y gadgets", "Streaming y suscripciones", "Educación física y mental", "Ocio y entretenimiento", "Gastos personales varios"];
 const INCOME_CATEGORIES = ["Sueldo", "Trabajo freelance", "Comisiones", "Ventas", "Devoluciones", "Intereses", "Ahorro personal", "Otros ingresos"];
@@ -203,7 +250,181 @@ const parseCSV = text => {
 };
 
 /* ============================ Datos de ejemplo ============================ */
-const sampleData = () => ([{"id":"m-mtg40uvl-b1mz7u","date":"2026-08-07","type":"Gasto","name":"retiro bcp","amountPEN":20,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Débito o retiro de efectivo","notes":"","createdAt":"2026-08-30T17:55:15.153Z","updatedAt":"2026-08-30T17:55:15.153Z"},{"id":"m-mtg40ce9-z7sy9k","date":"2026-08-12","type":"Gasto","name":"Retiro efectio","amountPEN":20,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Débito o retiro de efectivo","notes":"","createdAt":"2026-08-30T17:54:51.201Z","updatedAt":"2026-08-30T17:54:51.201Z"},{"id":"m-mtg3ztn2-ndwm1m","date":"2026-08-16","type":"Gasto","name":"Retiro efectivo bcp","amountPEN":20,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Débito o retiro de efectivo","notes":"","createdAt":"2026-08-30T17:54:26.894Z","updatedAt":"2026-08-30T17:54:26.894Z"},{"id":"m-mtg3yiw4-tucxrz","date":"2026-08-24","type":"Gasto","name":"Retiro efectivo BCP","amountPEN":20,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Débito o retiro de efectivo","notes":"","createdAt":"2026-08-30T17:53:26.308Z","updatedAt":"2026-08-30T17:53:26.308Z"},{"id":"m-mtg3wvuv-2isma6","date":"2026-08-29","type":"Gasto","name":"Streaming","amountPEN":37,"amountUSD":0,"category":"Streaming y suscripciones","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T17:52:09.799Z","updatedAt":"2026-08-30T17:52:09.799Z"},{"id":"m-mtg3wam8-zh0ywx","date":"2026-08-29","type":"Gasto","name":"Micro","amountPEN":3.5,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T17:51:42.272Z","updatedAt":"2026-08-30T17:51:42.272Z"},{"id":"m-mtg3vkpd-p5zvyp","date":"2026-08-27","type":"Gasto","name":"Baile Saoco","amountPEN":50,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T17:51:08.689Z","updatedAt":"2026-08-30T17:51:08.689Z"},{"id":"m-mtg3uybd-c2pbw4","date":"2026-08-26","type":"Gasto","name":"Chifa","amountPEN":14,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T17:50:39.673Z","updatedAt":"2026-08-30T17:50:39.673Z"},{"id":"m-mtg3ul98-58e0nn","date":"2026-08-25","type":"Gasto","name":"Emoliente","amountPEN":5,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T17:50:22.748Z","updatedAt":"2026-08-30T17:50:22.748Z"},{"id":"m-mtg3u66s-qgw426","date":"2026-08-24","type":"Gasto","name":"Brazalete","amountPEN":25,"amountUSD":0,"category":"Ropa, calzado y accesorios","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T17:50:03.220Z","updatedAt":"2026-08-30T17:50:03.220Z"},{"id":"m-mtg3tn8g-fzrrct","date":"2026-08-22","type":"Gasto","name":"Taxi","amountPEN":6.7,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T17:49:38.656Z","updatedAt":"2026-08-30T17:49:38.657Z"},{"id":"m-mtf496a1-nh93xs","date":"2026-08-22","type":"Gasto","name":"Totas","amountPEN":50,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:13:57.001Z","updatedAt":"2026-08-30T01:13:57.001Z"},{"id":"m-mtf48qx8-zejie5","date":"2026-08-22","type":"Gasto","name":"Taxi","amountPEN":9,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:13:37.100Z","updatedAt":"2026-08-30T01:13:37.100Z"},{"id":"m-mtf48grs-4yx4rs","date":"2026-08-22","type":"Gasto","name":"Clases de manejo","amountPEN":330,"amountUSD":0,"category":"Educación física y mental","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:13:23.944Z","updatedAt":"2026-08-30T01:13:23.944Z"},{"id":"m-mtf482jw-l330os","date":"2026-08-21","type":"Gasto","name":"Pantalon transporte","amountPEN":6.3,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:13:05.516Z","updatedAt":"2026-08-30T01:13:05.516Z"},{"id":"m-mtf47e84-t5g6zk","date":"2026-08-21","type":"Gasto","name":"Tequeños","amountPEN":9.6,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:12:33.989Z","updatedAt":"2026-08-30T01:12:33.989Z"},{"id":"m-mtf472k8-dz5u4i","date":"2026-08-21","type":"Gasto","name":"Wantan","amountPEN":4.5,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:12:18.872Z","updatedAt":"2026-08-30T01:12:18.872Z"},{"id":"m-mtf46qfk-i9rmgo","date":"2026-08-21","type":"Gasto","name":"Examen medico","amountPEN":150,"amountUSD":0,"category":"Educación física y mental","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:12:03.152Z","updatedAt":"2026-08-30T01:12:03.152Z"},{"id":"m-mtf45scs-jx4eiu","date":"2026-08-19","type":"Gasto","name":"Broster","amountPEN":17,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:11:18.988Z","updatedAt":"2026-08-30T01:11:18.988Z"},{"id":"m-mtf45hyk-w8c5vo","date":"2026-08-18","type":"Gasto","name":"Vestuario ZS","amountPEN":90,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:11:05.516Z","updatedAt":"2026-08-30T01:11:05.516Z"},{"id":"m-mtf44zvw-owjn6h","date":"2026-08-18","type":"Gasto","name":"Evento ZS","amountPEN":60,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:10:42.092Z","updatedAt":"2026-08-30T01:10:42.092Z"},{"id":"m-mtf44npo-n3lfq1","date":"2026-08-17","type":"Gasto","name":"Tesis","amountPEN":153.6,"amountUSD":0,"category":"Educación física y mental","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:10:26.316Z","updatedAt":"2026-08-30T01:10:26.316Z"},{"id":"m-mtf444po-zfnefn","date":"2026-08-17","type":"Gasto","name":"Celular","amountPEN":40,"amountUSD":0,"category":"Tecnología, servicios y gadgets","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:10:01.692Z","updatedAt":"2026-08-30T01:10:01.692Z"},{"id":"m-mtf43twk-pvgigp","date":"2026-08-16","type":"Gasto","name":"Uber","amountPEN":12.8,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:09:47.684Z","updatedAt":"2026-08-30T01:09:47.684Z"},{"id":"m-mtf43j6g-56293q","date":"2026-08-16","type":"Gasto","name":"Manejo","amountPEN":100,"amountUSD":0,"category":"Educación física y mental","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-30T01:09:33.784Z","updatedAt":"2026-08-30T01:09:33.784Z"},{"id":"m-mtf41r3g-et0sj2","date":"2026-08-29","type":"Gasto","name":"Menu","amountPEN":25,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:08:10.732Z","updatedAt":"2026-08-30T01:08:10.732Z"},{"id":"m-mtf41evk-8s0jx4","date":"2026-08-22","type":"Gasto","name":"Uber","amountPEN":22.3,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:07:54.896Z","updatedAt":"2026-08-30T01:07:54.896Z"},{"id":"m-mtf40su9-xbe964","date":"2026-08-28","type":"Gasto","name":"Oxxo","amountPEN":12,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:07:26.337Z","updatedAt":"2026-08-30T01:07:26.337Z"},{"id":"m-mtf40dtk-lrgv03","date":"2026-08-28","type":"Gasto","name":"Naed Peru","amountPEN":11.9,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:07:06.872Z","updatedAt":"2026-08-30T01:07:06.872Z"},{"id":"m-mtf400jl-1b99g7","date":"2026-08-28","type":"Gasto","name":"Sevilla","amountPEN":11.9,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:06:49.665Z","updatedAt":"2026-08-30T01:06:49.665Z"},{"id":"m-mtf3zm6x-46lg9m","date":"2026-08-28","type":"Gasto","name":"Napoleon dulce","amountPEN":51,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:06:31.065Z","updatedAt":"2026-08-30T01:06:31.065Z"},{"id":"m-mtf3z8nk-vdsaq9","date":"2026-08-27","type":"Gasto","name":"Chat gpt","amountPEN":80,"amountUSD":0,"category":"Streaming y suscripciones","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:06:13.520Z","updatedAt":"2026-08-30T01:06:13.520Z"},{"id":"m-mtf3ypt4-vd8l2a","date":"2026-08-26","type":"Gasto","name":"Uber","amountPEN":15.3,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:05:49.096Z","updatedAt":"2026-08-30T01:05:49.096Z"},{"id":"m-mtf3ye0q-omp20s","date":"2026-08-26","type":"Gasto","name":"Tambo","amountPEN":9.08,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:05:33.818Z","updatedAt":"2026-08-30T01:05:33.818Z"},{"id":"m-mtf3xwh5-wgs41r","date":"2026-08-24","type":"Gasto","name":"Dulce Belaunde","amountPEN":14.99,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:05:11.081Z","updatedAt":"2026-08-30T01:05:11.081Z"},{"id":"m-mtf3xedk-cijvt4","date":"2026-08-23","type":"Gasto","name":"Uber","amountPEN":9.5,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:04:47.624Z","updatedAt":"2026-08-30T01:04:47.624Z"},{"id":"m-mtf3x0u9-81138m","date":"2026-08-22","type":"Gasto","name":"NonaPharma","amountPEN":34.2,"amountUSD":0,"category":"Cuidado personal","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:04:30.081Z","updatedAt":"2026-08-30T01:04:30.081Z"},{"id":"m-mtf3wl4l-epmjob","date":"2026-08-22","type":"Gasto","name":"Spotify","amountPEN":11.9,"amountUSD":0,"category":"Streaming y suscripciones","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:04:09.717Z","updatedAt":"2026-08-30T01:04:09.717Z"},{"id":"m-mtf3w5rh-kzusu6","date":"2026-08-21","type":"Gasto","name":"Emoliente","amountPEN":4.5,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:03:49.805Z","updatedAt":"2026-08-30T01:03:49.805Z"},{"id":"m-mtf3vrb8-6c5rb3","date":"2026-08-22","type":"Gasto","name":"Uber","amountPEN":12.9,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:03:31.076Z","updatedAt":"2026-08-30T01:03:31.076Z"},{"id":"m-mtf3vdac-17dqi0","date":"2026-08-16","type":"Gasto","name":"Vaope","amountPEN":88.3,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:03:12.900Z","updatedAt":"2026-08-30T01:03:12.900Z"},{"id":"m-mtf3uuu0-yjtrx1","date":"2026-08-16","type":"Gasto","name":"Uber","amountPEN":17.3,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:02:48.984Z","updatedAt":"2026-08-30T01:02:48.984Z"},{"id":"m-mtf3uiic-58sz4i","date":"2026-08-16","type":"Gasto","name":"Tragos Cencosud","amountPEN":24.7,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:02:33.012Z","updatedAt":"2026-08-30T01:02:33.013Z"},{"id":"m-mtf3txqt-3jn6lv","date":"2026-08-15","type":"Gasto","name":"Uber rides","amountPEN":11.1,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:02:06.101Z","updatedAt":"2026-08-30T01:02:06.101Z"},{"id":"m-mtf3tk52-zwk100","date":"2026-08-14","type":"Gasto","name":"Almuerzo","amountPEN":14,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-30T01:01:48.470Z","updatedAt":"2026-08-30T01:01:48.470Z"},{"id":"m-mstigzxe-rw8kke","date":"2026-08-05","type":"Ingreso","name":"Ingresos GoSCM","amountPEN":3371,"amountUSD":0,"category":"Sueldo","financialEntity":"","paymentMethod":"","notes":"","createdAt":"2026-08-14T22:21:00.770Z","updatedAt":"2026-08-14T22:21:00.770Z"},{"id":"m-mstifpu2-ha3x5d","date":"2026-08-13","type":"Gasto","name":"Menu Like","amountPEN":14,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:20:01.034Z","updatedAt":"2026-08-14T22:20:01.034Z"},{"id":"m-mstif3dn-v7radw","date":"2026-08-13","type":"Gasto","name":"Uber","amountPEN":25.1,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:19:31.931Z","updatedAt":"2026-08-14T22:19:31.931Z"},{"id":"m-mstiemfp-7rmyf4","date":"2026-08-12","type":"Gasto","name":"Almuerzo like","amountPEN":14,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:19:09.973Z","updatedAt":"2026-08-14T22:19:09.973Z"},{"id":"m-mstie83h-v4wlk0","date":"2026-08-15","type":"Gasto","name":"Uber","amountPEN":27.9,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:18:51.389Z","updatedAt":"2026-08-14T22:18:51.389Z"},{"id":"m-mstidn0u-w3t2xj","date":"2026-08-11","type":"Gasto","name":"Menu like","amountPEN":15,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:18:24.078Z","updatedAt":"2026-08-14T22:18:24.078Z"},{"id":"m-mstid32c-3zrh6d","date":"2026-08-10","type":"Gasto","name":"Wong Agua","amountPEN":2.9,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:17:58.212Z","updatedAt":"2026-08-14T22:17:58.212Z"},{"id":"m-msticikc-eir3hh","date":"2026-08-10","type":"Gasto","name":"Kauza","amountPEN":59,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:17:31.644Z","updatedAt":"2026-08-14T22:17:31.644Z"},{"id":"m-mstic1j5-5i4t8d","date":"2026-08-09","type":"Gasto","name":"Chifa","amountPEN":39,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:17:09.569Z","updatedAt":"2026-08-14T22:17:09.569Z"},{"id":"m-mstib8gt-3wq1ij","date":"2026-08-09","type":"Gasto","name":"Bus","amountPEN":20,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:16:31.901Z","updatedAt":"2026-08-14T22:16:31.901Z"},{"id":"m-mstiaszl-w50rgo","date":"2026-08-07","type":"Gasto","name":"Nonapharma Dulce coreano","amountPEN":20,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:16:11.841Z","updatedAt":"2026-08-14T22:16:11.841Z"},{"id":"m-msti7ci8-pm963l","date":"2026-08-06","type":"Gasto","name":"Caldo","amountPEN":72,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:13:30.512Z","updatedAt":"2026-08-14T22:13:30.512Z"},{"id":"m-msti5th3-wpzei2","date":"2026-08-05","type":"Gasto","name":"Starbucks","amountPEN":9,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-14T22:12:19.191Z","updatedAt":"2026-08-14T22:12:19.191Z"},{"id":"m-msti1x2r-jt293g","date":"2026-08-14","type":"Gasto","name":"Taxi","amountPEN":23.2,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:09:17.235Z","updatedAt":"2026-08-14T22:09:17.235Z"},{"id":"m-msti1igv-89sdzc","date":"2026-08-13","type":"Gasto","name":"Pantalon adelanto","amountPEN":50,"amountUSD":0,"category":"Ropa, calzado y accesorios","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:08:58.303Z","updatedAt":"2026-08-14T22:08:58.303Z"},{"id":"m-msti0vk2-8vd1by","date":"2026-08-13","type":"Gasto","name":"Cumple marnie","amountPEN":21.5,"amountUSD":0,"category":"Gastos personales varios","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:08:28.610Z","updatedAt":"2026-08-14T22:08:28.611Z"},{"id":"m-msti01e1-emmw7w","date":"2026-08-12","type":"Gasto","name":"Micro","amountPEN":2.5,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:07:49.513Z","updatedAt":"2026-08-14T22:07:49.513Z"},{"id":"m-msthz31a-0apgma","date":"2026-08-11","type":"Gasto","name":"Taxi + Micro","amountPEN":27.8,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:07:04.990Z","updatedAt":"2026-08-14T22:07:04.990Z"},{"id":"m-msthy9xu-5j4sd4","date":"2026-08-10","type":"Gasto","name":"Vestuario Alquiler","amountPEN":50,"amountUSD":0,"category":"Gastos personales varios","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:06:27.282Z","updatedAt":"2026-08-14T22:06:27.282Z"},{"id":"m-msthxkbj-ue2w5p","date":"2026-08-10","type":"Gasto","name":"Taxi","amountPEN":16,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:05:54.079Z","updatedAt":"2026-08-14T22:05:54.079Z"},{"id":"m-msthwxd3-8c7mc3","date":"2026-08-09","type":"Gasto","name":"Comida + Galletas","amountPEN":22,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:05:24.327Z","updatedAt":"2026-08-14T22:05:24.327Z"},{"id":"m-msthvz89-pl4zmc","date":"2026-08-05","type":"Gasto","name":"Micro","amountPEN":18,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:04:40.089Z","updatedAt":"2026-08-14T22:04:40.089Z"},{"id":"m-msthv3p7-yi83dp","date":"2026-08-03","type":"Gasto","name":"Emoliente","amountPEN":4,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-14T22:03:59.227Z","updatedAt":"2026-08-14T22:03:59.227Z"},{"id":"m-msdfymnq-tcf99c","date":"2026-08-02","type":"Gasto","name":"Taxi Indrive","amountPEN":59,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-03T16:26:25.718Z","updatedAt":"2026-08-03T16:26:25.718Z"},{"id":"m-msdfxwtw-70rnqy","date":"2026-08-01","type":"Gasto","name":"Tolenera","amountPEN":10,"amountUSD":0,"category":"Ropa, calzado y accesorios","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-08-03T16:25:52.244Z","updatedAt":"2026-08-03T16:25:52.244Z"},{"id":"m-msdfx08g-n5iz14","date":"2026-08-02","type":"Gasto","name":"Postre arenales","amountPEN":32,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-03T16:25:10.000Z","updatedAt":"2026-08-03T16:25:10.000Z"},{"id":"m-msdfw3yu-iun4mh","date":"2026-08-02","type":"Gasto","name":"Resistencia","amountPEN":52,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-03T16:24:28.182Z","updatedAt":"2026-08-03T16:24:28.182Z"},{"id":"m-msdfve4y-ucr0q2","date":"2026-08-01","type":"Gasto","name":"Almuerzo","amountPEN":24,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-08-03T16:23:54.706Z","updatedAt":"2026-08-03T16:23:54.706Z"},{"id":"m-msdfu9h2-d7ehiw","date":"2026-08-03","type":"Gasto","name":"Donacion de Libro UNMSM","amountPEN":185,"amountUSD":0,"category":"Educación física y mental","financialEntity":"BCP","paymentMethod":"Débito o transferencia","notes":"","createdAt":"2026-08-03T16:23:02.006Z","updatedAt":"2026-08-03T16:23:02.006Z"},{"id":"m-ms3shbok-20i42h","date":"2026-07-26","type":"Gasto","name":"Micro+Pan+Sencillo","amountPEN":26,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:19:11.589Z","updatedAt":"2026-07-27T22:19:11.589Z"},{"id":"m-ms3sgi6g-n6wn5q","date":"2026-07-24","type":"Gasto","name":"Copias Tesis","amountPEN":41.6,"amountUSD":0,"category":"Gastos personales varios","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:18:33.352Z","updatedAt":"2026-07-27T22:18:33.352Z"},{"id":"m-ms3sfxb3-bzbb7q","date":"2026-07-23","type":"Gasto","name":"Taxi","amountPEN":20,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:18:06.303Z","updatedAt":"2026-07-27T22:18:06.303Z"},{"id":"m-ms3sf855-s9mepe","date":"2026-07-19","type":"Gasto","name":"Chups","amountPEN":6,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:17:33.689Z","updatedAt":"2026-07-27T22:17:33.689Z"},{"id":"m-ms3sesz0-52tr7d","date":"2026-07-19","type":"Gasto","name":"Pecanas","amountPEN":8,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:17:14.028Z","updatedAt":"2026-07-27T22:17:14.028Z"},{"id":"m-ms3se7s2-jf2u0y","date":"2026-07-16","type":"Gasto","name":"Sencillo","amountPEN":50,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:16:46.562Z","updatedAt":"2026-07-27T22:16:46.562Z"},{"id":"m-ms3sdphw-jzicrb","date":"2026-07-12","type":"Gasto","name":"Taxi","amountPEN":24.8,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:16:22.868Z","updatedAt":"2026-07-27T22:16:22.868Z"},{"id":"m-ms3scxc0-3s75pu","date":"2026-07-05","type":"Gasto","name":"Gloria Pro","amountPEN":5,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:15:46.368Z","updatedAt":"2026-07-27T22:15:46.368Z"},{"id":"m-ms3scdw5-9iir4q","date":"2026-07-07","type":"Gasto","name":"Micro","amountPEN":9.5,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:15:21.173Z","updatedAt":"2026-07-27T22:15:21.173Z"},{"id":"m-ms3sbnnj-1vgn58","date":"2026-07-05","type":"Gasto","name":"Torta","amountPEN":7,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:14:47.167Z","updatedAt":"2026-07-27T22:14:47.167Z"},{"id":"m-ms3sb1uv-qmh7fy","date":"2026-07-05","type":"Gasto","name":"Micro","amountPEN":6,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:14:18.919Z","updatedAt":"2026-07-27T22:14:18.919Z"},{"id":"m-ms3sam07-6of04g","date":"2026-07-03","type":"Gasto","name":"Micro","amountPEN":10,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:13:58.375Z","updatedAt":"2026-07-27T22:13:58.375Z"},{"id":"m-ms3sa3k4-5t985o","date":"2026-07-01","type":"Gasto","name":"Micro","amountPEN":3,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:13:34.468Z","updatedAt":"2026-07-27T22:13:34.468Z"},{"id":"m-ms3s9mwo-jl6z0s","date":"2026-07-01","type":"Gasto","name":"Crema","amountPEN":2,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Yape","notes":"","createdAt":"2026-07-27T22:13:12.888Z","updatedAt":"2026-07-27T22:13:12.888Z"},{"id":"m-ms3s7kvx-0kref5","date":"2026-07-18","type":"Gasto","name":"Quimika","amountPEN":80,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BBVA","paymentMethod":"Crédito BFree","notes":"","createdAt":"2026-07-27T22:11:36.957Z","updatedAt":"2026-07-27T22:11:36.957Z"},{"id":"m-ms3s6nvx-siu2ij","date":"2026-07-17","type":"Gasto","name":"Ripley Zapatillas","amountPEN":129,"amountUSD":0,"category":"Ropa, calzado y accesorios","financialEntity":"BBVA","paymentMethod":"Crédito BFree","notes":"","createdAt":"2026-07-27T22:10:54.189Z","updatedAt":"2026-07-27T22:12:01.633Z"},{"id":"m-ms3s685a-tqpkwc","date":"2026-07-16","type":"Gasto","name":"Coolbox Audifonos","amountPEN":20.9,"amountUSD":0,"category":"Tecnología, servicios y gadgets","financialEntity":"BBVA","paymentMethod":"Crédito BFree","notes":"","createdAt":"2026-07-27T22:10:33.790Z","updatedAt":"2026-07-27T22:12:25.126Z"},{"id":"m-ms3s3m7q-5dq0xw","date":"2026-07-27","type":"Gasto","name":"Chatgpt","amountPEN":80,"amountUSD":0,"category":"Streaming y suscripciones","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:08:32.054Z","updatedAt":"2026-07-27T22:08:32.054Z"},{"id":"m-ms3s35kx-x1cm4i","date":"2026-07-26","type":"Gasto","name":"Dosis Dulce Cafeteria","amountPEN":105,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:08:10.497Z","updatedAt":"2026-07-27T22:08:10.497Z"},{"id":"m-ms3s2fkr-zaxsy3","date":"2026-07-26","type":"Gasto","name":"Uber","amountPEN":20.9,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:07:36.795Z","updatedAt":"2026-07-27T22:07:36.795Z"},{"id":"m-ms3s1yba-tenbpf","date":"2026-07-26","type":"Gasto","name":"Quimika Disco","amountPEN":20,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:07:14.422Z","updatedAt":"2026-07-27T22:07:14.422Z"},{"id":"m-ms3s1as9-2p6rwx","date":"2026-07-25","type":"Gasto","name":"Uber","amountPEN":8.7,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:06:43.929Z","updatedAt":"2026-07-27T22:06:43.929Z"},{"id":"m-ms3s0rsg-upcsmw","date":"2026-07-24","type":"Gasto","name":"Uber","amountPEN":55.6,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:06:19.312Z","updatedAt":"2026-07-27T22:06:19.312Z"},{"id":"m-ms3s01jw-orjw8m","date":"2026-07-22","type":"Gasto","name":"Transporte","amountPEN":3.9,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:05:45.308Z","updatedAt":"2026-07-27T22:05:45.308Z"},{"id":"m-ms3rzcil-xzyf3e","date":"2026-07-22","type":"Gasto","name":"Spotify","amountPEN":11.9,"amountUSD":0,"category":"Streaming y suscripciones","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:05:12.861Z","updatedAt":"2026-07-27T22:05:12.861Z"},{"id":"m-ms3ryliz-5j7pkf","date":"2026-07-19","type":"Gasto","name":"Uber","amountPEN":13.4,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:04:37.883Z","updatedAt":"2026-07-27T22:04:37.883Z"},{"id":"m-ms3ry26i-slhvz1","date":"2026-07-19","type":"Gasto","name":"Rappi","amountPEN":30,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:04:12.810Z","updatedAt":"2026-07-27T22:04:12.810Z"},{"id":"m-ms3rvwyv-n4atli","date":"2026-07-18","type":"Gasto","name":"Agua","amountPEN":2.2,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:02:32.743Z","updatedAt":"2026-07-27T22:02:32.743Z"},{"id":"m-ms3rvdoe-u6no6z","date":"2026-07-17","type":"Gasto","name":"Uber","amountPEN":7.3,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:02:07.742Z","updatedAt":"2026-07-27T22:02:07.742Z"},{"id":"m-ms3ruhuo-ejaccn","date":"2026-07-13","type":"Gasto","name":"Bitel","amountPEN":39.95,"amountUSD":0,"category":"Tecnología, servicios y gadgets","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:01:26.497Z","updatedAt":"2026-07-27T22:01:26.497Z"},{"id":"m-ms3rtx97-c1ufq0","date":"2026-07-13","type":"Gasto","name":"Colchon","amountPEN":0.01,"amountUSD":0,"category":"Gastos personales varios","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"Mama me dara 1518","createdAt":"2026-07-27T22:00:59.803Z","updatedAt":"2026-07-27T22:01:41.946Z"},{"id":"m-ms3rstql-zjz0re","date":"2026-07-12","type":"Gasto","name":"Uber","amountPEN":17.4,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T22:00:08.589Z","updatedAt":"2026-07-27T22:00:08.589Z"},{"id":"m-ms3rs5hc-xq3tu6","date":"2026-07-11","type":"Gasto","name":"Uber","amountPEN":9.5,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:59:37.152Z","updatedAt":"2026-07-27T21:59:37.152Z"},{"id":"m-ms3rrl7s-o2c97k","date":"2026-07-07","type":"Gasto","name":"Uber","amountPEN":8.7,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:59:10.888Z","updatedAt":"2026-07-27T21:59:10.889Z"},{"id":"m-ms3rqmos-fnp9ix","date":"2026-07-05","type":"Gasto","name":"Almuerzo","amountPEN":24,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:58:26.140Z","updatedAt":"2026-07-27T21:58:26.140Z"},{"id":"m-ms3rpo07-rstbpx","date":"2026-07-05","type":"Gasto","name":"Cineplanet","amountPEN":24,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:57:41.191Z","updatedAt":"2026-07-27T21:57:41.191Z"},{"id":"m-ms3rp3od-oqu1vi","date":"2026-07-05","type":"Gasto","name":"Uber","amountPEN":8.1,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:57:14.845Z","updatedAt":"2026-07-27T21:57:14.845Z"},{"id":"m-ms3rnnrz-mlkkeh","date":"2026-07-04","type":"Gasto","name":"Uber","amountPEN":10.7,"amountUSD":0,"category":"Transporte","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:56:07.583Z","updatedAt":"2026-07-27T21:56:07.583Z"},{"id":"m-ms3rn7jo-rwf165","date":"2026-07-04","type":"Gasto","name":"Dulce","amountPEN":25.9,"amountUSD":0,"category":"Ocio y entretenimiento","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:55:46.548Z","updatedAt":"2026-07-27T21:55:46.548Z"},{"id":"m-ms3rmdj7-539zav","date":"2026-07-04","type":"Gasto","name":"Dulces","amountPEN":15.4,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:55:07.652Z","updatedAt":"2026-07-27T21:55:07.652Z"},{"id":"m-ms3rlosd-rsqnw4","date":"2026-07-04","type":"Gasto","name":"Pescado Frito","amountPEN":116,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:54:35.581Z","updatedAt":"2026-07-27T21:54:35.581Z"},{"id":"m-ms3rkijv-9ahmeo","date":"2026-07-03","type":"Gasto","name":"Starbucks","amountPEN":6,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:53:40.843Z","updatedAt":"2026-07-27T21:53:40.843Z"},{"id":"m-ms3rjyj2-ng1cwt","date":"2026-07-03","type":"Gasto","name":"Almuerzo Don Mamino","amountPEN":38,"amountUSD":0,"category":"Alimentación","financialEntity":"BCP","paymentMethod":"Crédito IO","notes":"","createdAt":"2026-07-27T21:53:14.894Z","updatedAt":"2026-07-27T21:53:14.894Z"},{"id":"m-ms3ril42-qjkinh","date":"2026-07-03","type":"Ingreso","name":"Sueldo para Julio","amountPEN":3400,"amountUSD":0,"category":"Sueldo","financialEntity":"","paymentMethod":"","notes":"","createdAt":"2026-07-27T21:52:10.851Z","updatedAt":"2026-07-27T21:52:10.851Z"}]);
+const sampleData = () => {
+  const base = (o, i) => ({
+    id: "sample-" + i,
+    name: "",
+    type: "Gasto",
+    date: "2026-01-01",
+    amountPEN: 0,
+    amountUSD: 0,
+    category: "",
+    financialEntity: "",
+    paymentMethod: "",
+    notes: "",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...o
+  });
+  const d = [{
+    date: "2026-01-05",
+    type: "Ingreso",
+    name: "Sueldo enero",
+    amountPEN: 4500,
+    category: "Sueldo",
+    financialEntity: "BCP",
+    paymentMethod: "Débito o transferencia",
+    notes: "Depósito de planilla"
+  }, {
+    date: "2026-01-06",
+    type: "Ahorro",
+    name: "Ahorro programado",
+    amountPEN: 600,
+    category: "Ahorro personal",
+    financialEntity: "BCP",
+    paymentMethod: "Débito o transferencia"
+  }, {
+    date: "2026-01-08",
+    type: "Gasto",
+    name: "Restaurante Mantay",
+    amountPEN: 74,
+    category: "Alimentación",
+    financialEntity: "BCP",
+    paymentMethod: "Crédito IO"
+  }, {
+    date: "2026-01-12",
+    type: "Gasto",
+    name: "Uber al trabajo",
+    amountPEN: 34.9,
+    category: "Transporte",
+    financialEntity: "BCP",
+    paymentMethod: "Yape"
+  }, {
+    date: "2026-01-20",
+    type: "Gasto",
+    name: "Suscripción Netflix",
+    amountPEN: 44.9,
+    category: "Streaming y suscripciones",
+    financialEntity: "BBVA",
+    paymentMethod: "Crédito BFree",
+    notes: "Plan mensual"
+  }, {
+    date: "2026-02-05",
+    type: "Ingreso",
+    name: "Sueldo febrero",
+    amountPEN: 4500,
+    category: "Sueldo",
+    financialEntity: "BCP",
+    paymentMethod: "Débito o transferencia"
+  }, {
+    date: "2026-02-07",
+    type: "Gasto",
+    name: "Zapatillas running",
+    amountPEN: 320,
+    category: "Ropa, calzado y accesorios",
+    financialEntity: "Interbank",
+    paymentMethod: "Crédito"
+  }, {
+    date: "2026-02-14",
+    type: "Gasto",
+    name: "Cine + cena",
+    amountPEN: 95,
+    category: "Ocio y entretenimiento",
+    financialEntity: "BBVA",
+    paymentMethod: "Plin"
+  }, {
+    date: "2026-02-18",
+    type: "Gasto",
+    name: "Curso Udemy",
+    amountUSD: 15.99,
+    category: "Educación física y mental",
+    financialEntity: "BCP",
+    paymentMethod: "Crédito Light",
+    notes: "Pago en dólares"
+  }, {
+    date: "2026-02-25",
+    type: "Ingreso",
+    name: "Reembolso compra",
+    amountPEN: 120,
+    category: "Devoluciones",
+    financialEntity: "Interbank",
+    paymentMethod: "Débito o transferencia"
+  }, {
+    date: "2026-03-05",
+    type: "Ingreso",
+    name: "Sueldo marzo",
+    amountPEN: 4500,
+    category: "Sueldo",
+    financialEntity: "BCP",
+    paymentMethod: "Débito o transferencia"
+  }, {
+    date: "2026-03-09",
+    type: "Gasto",
+    name: "Mercado semanal",
+    amountPEN: 210,
+    category: "Alimentación",
+    financialEntity: "Efectivo",
+    paymentMethod: "Efectivo"
+  }, {
+    date: "2026-03-15",
+    type: "Gasto",
+    name: "Corte de cabello",
+    amountPEN: 45,
+    category: "Cuidado personal",
+    financialEntity: "Efectivo",
+    paymentMethod: "Efectivo"
+  }, {
+    date: "2026-03-22",
+    type: "Gasto",
+    name: "Auriculares",
+    amountUSD: 89,
+    category: "Tecnología, servicios y gadgets",
+    financialEntity: "BCP",
+    paymentMethod: "Crédito IO",
+    notes: "Compra internacional"
+  }, {
+    date: "2026-04-05",
+    type: "Ingreso",
+    name: "Freelance diseño",
+    amountUSD: 400,
+    category: "Trabajo freelance",
+    financialEntity: "BBVA",
+    paymentMethod: "Débito o transferencia"
+  }, {
+    date: "2026-04-10",
+    type: "Gasto",
+    name: "Gimnasio mensual",
+    amountPEN: 129,
+    category: "Educación física y mental",
+    financialEntity: "Interbank",
+    paymentMethod: "Débito o transferencia"
+  }, {
+    date: "2026-05-06",
+    type: "Ingreso",
+    name: "Sueldo mayo",
+    amountPEN: 4500,
+    category: "Sueldo",
+    financialEntity: "BCP",
+    paymentMethod: "Débito o transferencia"
+  }, {
+    date: "2026-05-19",
+    type: "Gasto",
+    name: "Regalo cumpleaños",
+    amountPEN: 150,
+    category: "Gastos personales varios",
+    financialEntity: "Alfin",
+    paymentMethod: "Crédito"
+  }, {
+    date: "2026-06-04",
+    type: "Ahorro",
+    name: "Fondo de emergencia",
+    amountUSD: 100,
+    category: "Ahorro personal",
+    financialEntity: "BCP",
+    paymentMethod: "Débito o transferencia"
+  }];
+  return d.map((o, i) => base(o, i + 1));
+};
 
 /* ============================ Persistencia ============================ */
 const loadStore = () => {
@@ -544,6 +765,7 @@ Object.assign(I, {
   undo: _svg(["M3 7v6h6", "M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"]),
   coins: _svg(["M18.09 10.37A6 6 0 1 1 10.34 18", "M7 6h1v4", "m16.71 13.88.7.71-2.82 2.82"], [[8, 8, 6]]),
   piggy: _svg(["M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z", "M2 9v1c0 1.1.9 2 2 2h1", "M16 11h.01"]),
+  logout: _svg(["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "M16 17l5-5-5-5", "M21 12H9"]),
   bank: _svg(["M3 22h18", "M6 18v-7", "M10 18v-7", "M14 18v-7", "M18 18v-7", "M12 2l8 5H4z"])
 });
 const CAT_ICON = {
@@ -2188,13 +2410,91 @@ const NAV = [{
   l: "Configuración",
   ic: I.settings
 }];
-const App = () => {
+const App = ({
+  cloud
+}) => {
   const initial = useRef(loadStore());
-  const [movements, setMovements] = useState(() => {
-    const s = initial.current;
-    if (s && Array.isArray(s.movements)) return s.movements;
-    return sampleData();
-  });
+  const sb = cloud.sb;
+  const [movements, setMovements] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [sync, setSync] = useState("ok");
+  const snap = useRef(new Map());
+  const migratedRef = useRef(!!(initial.current && initial.current.cloudSynced));
+  const syncRef = useRef("ok");
+  syncRef.current = sync;
+  const snapOf = list => new Map(list.map(m => [m.id, JSON.stringify(toRow(m))]));
+  const loadFromCloud = useCallback(async first => {
+    try {
+      setLoadError(null);
+      const serverList = await fetchAllMovements(sb);
+      let list = serverList;
+      snap.current = snapOf(serverList);
+      if (first && !migratedRef.current) {
+        const st = initial.current;
+        const local = st && Array.isArray(st.movements) ? st.movements.filter(m => m && m.id && !String(m.id).startsWith("sample-")) : [];
+        const have = new Set(serverList.map(m => m.id));
+        const extra = local.filter(m => !have.has(m.id));
+        if (extra.length) list = [...extra, ...serverList];else migratedRef.current = true;
+      }
+      setMovements(list);
+      setLoaded(true);
+    } catch (e) {
+      if (first) setLoadError(e && e.message ? e.message : "No se pudo conectar");
+    }
+  }, [sb]);
+  useEffect(() => {
+    loadFromCloud(true);
+  }, []);
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible" && syncRef.current === "ok") loadFromCloud(false);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loadFromCloud]);
+  useEffect(() => {
+    if (!loaded) return;
+    const cur = snapOf(movements);
+    const up = [],
+      del = [];
+    cur.forEach((v, id) => {
+      if (snap.current.get(id) !== v) up.push(JSON.parse(v));
+    });
+    snap.current.forEach((v, id) => {
+      if (!cur.has(id)) del.push(id);
+    });
+    if (!up.length && !del.length) return;
+    setSync("saving");
+    (async () => {
+      try {
+        for (let i = 0; i < up.length; i += 200) {
+          const {
+            error
+          } = await sb.from("movements").upsert(up.slice(i, i + 200), {
+            onConflict: "id"
+          });
+          if (error) throw error;
+        }
+        for (let i = 0; i < del.length; i += 100) {
+          const {
+            error
+          } = await sb.from("movements").delete().in("id", del.slice(i, i + 100));
+          if (error) throw error;
+        }
+        snap.current = cur;
+        migratedRef.current = true;
+        setSync("ok");
+      } catch (e) {
+        setSync("error");
+      }
+    })();
+  }, [movements, loaded]);
+  useEffect(() => {
+    if (sync !== "error") return;
+    const t = setTimeout(() => setMovements(ms => [...ms]), 15000);
+    return () => clearTimeout(t);
+  }, [sync]);
   const [theme, setTheme] = useState(() => initial.current && initial.current.theme || "light");
   const sampleLoadedRef = useRef(initial.current ? !!initial.current.sampleLoaded : true);
   const [section, setSection] = useState("dashboard");
@@ -2207,12 +2507,13 @@ const App = () => {
   useEffect(() => {
     saveStore({
       version: 1,
-      movements,
+      movements: loaded ? movements : initial.current && initial.current.movements || [],
       theme,
       sampleLoaded: sampleLoadedRef.current,
+      cloudSynced: migratedRef.current,
       prefs: {}
     });
-  }, [movements, theme]);
+  }, [movements, theme, loaded, sync]);
 
   /* Tema */
   useEffect(() => {
@@ -2288,6 +2589,28 @@ const App = () => {
   };
   const hasSamples = movements.some(m => m.id.startsWith("sample-"));
   const curNav = NAV.find(n => n.k === section) || {};
+  if (!loaded) return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-full flex items-center justify-center p-6 text-slate-700 dark:text-slate-200"
+  }, /*#__PURE__*/React.createElement(Card, {
+    className: "p-6 max-w-sm w-full text-center"
+  }, loadError ? /*#__PURE__*/React.createElement("div", {
+    role: "alert"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-semibold text-red-600 dark:text-red-300"
+  }, "No se pudieron cargar tus movimientos"), /*#__PURE__*/React.createElement("p", {
+    className: "mt-1 text-sm text-slate-500 dark:text-slate-400"
+  }, "Revisa tu conexión a internet e inténtalo de nuevo."), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 flex justify-center gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => loadFromCloud(true),
+    className: "touch-btn px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800"
+  }, "Reintentar"), /*#__PURE__*/React.createElement("button", {
+    onClick: cloud.logout,
+    className: "touch-btn px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600"
+  }, "Cerrar sesión"))) : /*#__PURE__*/React.createElement("p", {
+    role: "status",
+    className: "text-sm"
+  }, "Cargando tus movimientos…")));
   return /*#__PURE__*/React.createElement("div", {
     className: "min-h-full flex flex-col md:flex-row text-slate-800 dark:text-slate-100"
   }, /*#__PURE__*/React.createElement("aside", {
@@ -2316,8 +2639,22 @@ const App = () => {
   }), /*#__PURE__*/React.createElement("span", {
     className: "nav-label"
   }, n.l === "Categorías" ? "Análisis por categorías" : n.l)))), /*#__PURE__*/React.createElement("div", {
-    className: "nav-label mt-auto text-xs text-slate-500 px-2 pt-6"
-  }, "Datos guardados en tu navegador.")), /*#__PURE__*/React.createElement("header", {
+    className: "mt-auto pt-6 space-y-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    className: "nav-label text-xs text-slate-400 px-2 truncate",
+    title: cloud.email
+  }, sync === "saving" ? "Guardando…" : sync === "error" ? "Sin conexión, reintentando" : "Sincronizado", " · ", cloud.email), /*#__PURE__*/React.createElement("button", {
+    onClick: cloud.logout,
+    title: "Cerrar sesión",
+    "aria-label": "Cerrar sesión",
+    className: "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    path: I.logout,
+    size: 18
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "nav-label"
+  }, "Cerrar sesión")))), /*#__PURE__*/React.createElement("header", {
     className: "md:hidden sticky top-0 z-30 bg-gradient-to-b from-[#0a1330] via-[#12234f] to-[#1e3a8a] text-white flex items-center justify-between px-4 py-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
@@ -2328,9 +2665,20 @@ const App = () => {
     size: 22
   })), /*#__PURE__*/React.createElement("span", {
     className: "font-bold"
-  }, "Mis Finanzas")), /*#__PURE__*/React.createElement("span", {
-    className: "text-sm text-slate-300"
-  }, curNav.l === "Categorías" ? "Análisis" : curNav.l)), /*#__PURE__*/React.createElement("main", {
+  }, "Mis Finanzas")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    role: "status",
+    className: "text-xs text-slate-300"
+  }, sync === "saving" ? "Guardando…" : sync === "error" ? "Sin conexión" : curNav.l === "Categorías" ? "Análisis" : curNav.l), /*#__PURE__*/React.createElement("button", {
+    onClick: cloud.logout,
+    "aria-label": "Cerrar sesión",
+    title: "Cerrar sesión",
+    className: "touch-btn inline-flex items-center justify-center px-2 rounded-lg text-slate-200 hover:bg-white/10"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    path: I.logout,
+    size: 20
+  })))), /*#__PURE__*/React.createElement("main", {
     className: "flex-1 p-3 sm:p-5 pb-24 md:pb-6 overflow-x-hidden"
   }, /*#__PURE__*/React.createElement("div", {
     className: "max-w-6xl mx-auto"
@@ -2656,6 +3004,116 @@ const HistoryBase = ({
     className: "px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-40 text-slate-700 dark:text-slate-200"
   }, "Siguiente"))))));
 };
-ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));</script>
+/* ============================ Acceso (Supabase Auth) ============================ */
+const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true
+  }
+}) : null;
+const Login = ({
+  sb
+}) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async e => {
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    try {
+      const {
+        error
+      } = await sb.auth.signInWithPassword({
+        email: email.trim(),
+        password
+      });
+      if (error) setErr(/invalid/i.test(error.message || "") ? "Correo o contraseña incorrectos." : "No se pudo iniciar sesión. Revisa tu conexión e inténtalo de nuevo.");
+    } catch (x) {
+      setErr("No se pudo iniciar sesión. Revisa tu conexión e inténtalo de nuevo.");
+    }
+    setBusy(false);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-full flex items-center justify-center p-4 text-slate-800 dark:text-slate-100"
+  }, /*#__PURE__*/React.createElement(Card, {
+    className: "p-6 max-w-sm w-full"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 mb-5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon-tile text-navy-b dark:text-blue-400"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    path: I.wallet,
+    size: 22
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
+    className: "text-xl font-bold"
+  }, "Mis Finanzas"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-500 dark:text-slate-400"
+  }, "Inicia sesión para ver tus movimientos"))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: submit,
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Correo electrónico"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    required: true,
+    autoComplete: "username",
+    className: inputCls,
+    value: email,
+    onChange: e => setEmail(e.target.value)
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Contraseña"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    required: true,
+    autoComplete: "current-password",
+    className: inputCls,
+    value: password,
+    onChange: e => setPassword(e.target.value)
+  })), err && /*#__PURE__*/React.createElement("p", {
+    role: "alert",
+    className: "text-sm text-red-600 dark:text-red-300"
+  }, err), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    disabled: busy,
+    className: "touch-btn w-full px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 disabled:opacity-40"
+  }, busy ? "Entrando…" : "Iniciar sesión"))));
+};
+const Root = () => {
+  const [session, setSession] = useState(undefined);
+  useEffect(() => {
+    const st = loadStore();
+    if (st && st.theme === "dark") document.documentElement.classList.add("dark");
+    if (!sbClient) return;
+    sbClient.auth.getSession().then(({
+      data
+    }) => setSession(data.session || null)).catch(() => setSession(null));
+    const {
+      data
+    } = sbClient.auth.onAuthStateChange((_e, s) => setSession(s || null));
+    return () => data.subscription.unsubscribe();
+  }, []);
+  if (!sbClient) return /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    className: "p-6 text-center text-red-600"
+  }, "No se pudo cargar el servicio de datos. Revisa tu conexión a internet y recarga la página.");
+  if (session === undefined) return /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    className: "min-h-full flex items-center justify-center text-sm text-slate-500"
+  }, "Cargando…");
+  if (!session) return /*#__PURE__*/React.createElement(Login, {
+    sb: sbClient
+  });
+  return /*#__PURE__*/React.createElement(App, {
+    key: session.user.id,
+    cloud: {
+      sb: sbClient,
+      email: session.user.email,
+      logout: () => sbClient.auth.signOut()
+    }
+  });
+};
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(Root, null));</script>
 </body>
 </html>

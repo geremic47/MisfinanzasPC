@@ -2,7 +2,7 @@
 
 Dashboard web de finanzas personales: registra ingresos y gastos, filtra por periodo y entidad, y revisa en un vistazo cuánto ahorras.
 
-Es una sola página estática (HTML + React + Recharts), sin servidor ni base de datos. Los datos se guardan en el navegador (`localStorage`).
+Es una página estática (HTML + React + Recharts) que guarda tus movimientos en la nube con [Supabase](https://supabase.com): inicias sesión y ves los mismos datos desde cualquier dispositivo.
 
 ## Funciones
 
@@ -24,7 +24,7 @@ Paleta azul marino, tipografía IBM Plex Sans, estilo minimalista. Accesibilidad
 
 ## Uso
 
-Abre `index.html` en el navegador o despliega la carpeta como sitio estático (Vercel, GitHub Pages, etc.). Se necesita conexión a internet para cargar React, Recharts y la tipografía desde CDN.
+Despliega la carpeta como sitio estático (Vercel, GitHub Pages, etc.) y abre `index.html`. Se necesita conexión a internet para cargar React, Recharts, Supabase y la tipografía desde CDN, e iniciar sesión.
 
 ## Estructura
 
@@ -38,6 +38,10 @@ Abre `index.html` en el navegador o despliega la carpeta como sitio estático (V
 - `main`: versión oficial publicada.
 - `mejoras-dashboard`: pruebas y mejoras; se copia a `main` al terminar.
 
-## Privacidad
+## Datos y privacidad
 
-Los movimientos incluidos en el código se cargan solo si el navegador no tiene datos guardados. Lo que registres después permanece en tu navegador.
+- Los movimientos viven en una tabla `movements` de Supabase protegida con Row Level Security: cada usuario solo accede a sus propias filas.
+- El registro público está desactivado; solo entra el usuario creado en el panel de Supabase.
+- La clave `anon` incluida en el código es pública por diseño; no hay claves secretas en el repositorio.
+- El código solo trae datos de ejemplo. Al primer inicio de sesión en un dispositivo, los movimientos que ya tenía guardados el navegador se suben una sola vez a la nube.
+- Respaldo: *Configuración → Exportar CSV / JSON*.
