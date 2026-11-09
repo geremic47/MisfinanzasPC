@@ -766,6 +766,8 @@ Object.assign(I, {
   coins: _svg(["M18.09 10.37A6 6 0 1 1 10.34 18", "M7 6h1v4", "m16.71 13.88.7.71-2.82 2.82"], [[8, 8, 6]]),
   piggy: _svg(["M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z", "M2 9v1c0 1.1.9 2 2 2h1", "M16 11h.01"]),
   logout: _svg(["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "M16 17l5-5-5-5", "M21 12H9"]),
+  mail: _svg(["M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "m22 7-10 7L2 7"]),
+  filetext: _svg(["M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z", "M14 2v6h6", "M16 13H8", "M16 17H8", "M10 9H8"]),
   bank: _svg(["M3 22h18", "M6 18v-7", "M10 18v-7", "M14 18v-7", "M18 18v-7", "M12 2l8 5H4z"])
 });
 const CAT_ICON = {
@@ -2114,6 +2116,85 @@ const CategoryAnalysis = ({
 };
 
 /* ============================ Configuración ============================ */
+const ReportCard = ({
+  movements,
+  cloud,
+  notify
+}) => {
+  const months = useMemo(() => Array.from(new Set(movements.map(m => m.date.slice(0, 7)))).sort().reverse(), [movements]);
+  const prevKey = (() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  })();
+  const [sel, setSel] = useState("");
+  const [state, setState] = useState("idle");
+  const [msg, setMsg] = useState("");
+  const value = sel || (months.includes(prevKey) ? prevKey : months[0] || "");
+  const label = k => MONTHS[+k.slice(5) - 1] + " " + k.slice(0, 4);
+  const send = async () => {
+    if (!value) return;
+    setState("sending");
+    setMsg("");
+    try {
+      const {
+        error
+      } = await cloud.sb.functions.invoke("enviar-reporte", {
+        body: {
+          anio: +value.slice(0, 4),
+          mes: +value.slice(5)
+        }
+      });
+      if (error) throw error;
+      setState("ok");
+      setMsg("Solicitud enviada. El PDF de " + label(value) + " llegará a tu correo en 1 o 2 minutos.");
+    } catch (e) {
+      const st = e && e.context && e.context.status;
+      setState("error");
+      setMsg(st === 404 ? "El envío por correo todavía no está activado en tu cuenta de Supabase." : st === 401 ? "Tu sesión venció. Cierra sesión y vuelve a entrar." : "No se pudo solicitar el reporte. Inténtalo de nuevo en unos minutos.");
+    }
+  };
+  return /*#__PURE__*/React.createElement(Card, {
+    className: "p-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon-tile text-navy-b dark:text-blue-400"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    path: I.filetext,
+    size: 20
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "font-semibold text-slate-700 dark:text-slate-200"
+  }, "Generar PDF"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-500 dark:text-slate-400"
+  }, "Genera el reporte mensual (resumen del mes y cómo vamos en el año) y recíbelo en tu correo. También se envía solo el día 3 de cada mes a las 6:00 a. m., hora de Lima."))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 flex flex-wrap items-center gap-3"
+  }, /*#__PURE__*/React.createElement("select", {
+    "aria-label": "Mes del reporte",
+    className: inputCls,
+    style: {
+      maxWidth: "14rem"
+    },
+    value: value,
+    disabled: !months.length || state === "sending",
+    onChange: e => setSel(e.target.value)
+  }, months.map(k => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, label(k)))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: send,
+    disabled: !value || state === "sending",
+    className: "touch-btn inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-40"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    path: I.mail,
+    size: 16
+  }), state === "sending" ? "Enviando…" : "Enviar reporte PDF por correo")), msg && /*#__PURE__*/React.createElement("p", {
+    role: "status",
+    className: "mt-3 text-sm " + (state === "error" ? "text-red-600 dark:text-red-300" : "text-slate-600 dark:text-slate-300")
+  }, msg));
+};
 const Settings = ({
   movements,
   setMovements,
@@ -2122,7 +2203,8 @@ const Settings = ({
   notify,
   confirm,
   reloadSamples,
-  hasSamples
+  hasSamples,
+  cloud
 }) => {
   const fileCSV = useRef(null);
   const fileJSON = useRef(null);
@@ -2305,7 +2387,11 @@ const Settings = ({
     className: "text-lg font-bold text-slate-800 dark:text-slate-100 mb-1"
   }, "Configuración"), /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-500 dark:text-slate-400"
-  }, "Apariencia y gestión de datos. Total actual: ", /*#__PURE__*/React.createElement("b", null, movements.length), " movimientos.")), /*#__PURE__*/React.createElement(Card, {
+  }, "Apariencia y gestión de datos. Total actual: ", /*#__PURE__*/React.createElement("b", null, movements.length), " movimientos.")), /*#__PURE__*/React.createElement(ReportCard, {
+    movements: movements,
+    cloud: cloud,
+    notify: notify
+  }), /*#__PURE__*/React.createElement(Card, {
     className: "p-5"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-semibold text-slate-700 dark:text-slate-200 mb-3"
@@ -2706,7 +2792,8 @@ const App = ({
     notify: notify,
     confirm: confirm,
     reloadSamples: reloadSamples,
-    hasSamples: hasSamples
+    hasSamples: hasSamples,
+    cloud: cloud
   }))), /*#__PURE__*/React.createElement("nav", {
     className: "bottom-nav md:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex",
     "aria-label": "Navegación principal"

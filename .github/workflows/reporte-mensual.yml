@@ -1,0 +1,40 @@
+name: Reporte mensual
+
+on:
+  schedule:
+    # Día 3 de cada mes a las 06:00 hora de Lima (UTC-5, sin horario de verano) = 11:00 UTC
+    - cron: "0 11 3 * *"
+  workflow_dispatch:
+    inputs:
+      anio:
+        description: "Año del reporte (vacío = mes anterior)"
+        required: false
+      mes:
+        description: "Mes 1-12 del reporte (vacío = mes anterior)"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reporte-mensual
+  cancel-in-progress: false
+
+jobs:
+  reporte:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generar el PDF y enviarlo por correo
+        env:
+          SUPABASE_URL: https://oaevtwjjgtysuodxbwlp.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
+          APP_USER_EMAIL: ${{ vars.APP_USER_EMAIL }}
+          META_AHORRO_PCT: "30"
+          ANIO: ${{ inputs.anio }}
+          MES: ${{ inputs.mes }}
+        run: python3 reporte/generar_reporte.py --enviar

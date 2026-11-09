@@ -26,12 +26,23 @@ Paleta azul marino, tipografía IBM Plex Sans, estilo minimalista. Accesibilidad
 
 Despliega la carpeta como sitio estático (Vercel, GitHub Pages, etc.) y abre `index.html`. Se necesita conexión a internet para cargar React, Recharts, Supabase y la tipografía desde CDN, e iniciar sesión.
 
+## Reporte mensual por correo
+
+- Cada **día 3 a las 6:00 a. m. (hora de Lima)** un flujo de GitHub Actions (`.github/workflows/reporte-mensual.yml`) lee tus movimientos de Supabase, genera un PDF de 2 páginas (resumen del mes y cómo vamos en el año) y lo envía por correo con Resend.
+- Meta de ahorro mensual: 30 % de los ingresos (variable `META_AHORRO_PCT` del flujo).
+- En la app, *Configuración → Generar PDF → Enviar reporte PDF por correo* lanza el mismo envío para el mes elegido, mediante la función `supabase/functions/enviar-reporte`.
+- Secretos (nunca en el código): `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `REPORT_TO_EMAIL` en *GitHub → Settings → Secrets → Actions*, y `GH_DISPATCH_TOKEN` en los secretos de la función de Supabase. Variable opcional: `APP_USER_EMAIL`.
+- Prueba local sin enviar: `python reporte/generar_reporte.py --csv mis-finanzas.csv --anio 2026 --mes 8`.
+
 ## Estructura
 
 | Archivo | Descripción |
 |---|---|
 | `index.html` | Aplicación completa |
 | `FinanzasPersonalesPC` | Misma aplicación (copia con el nombre original) |
+| `reporte/generar_reporte.py` | Genera el PDF mensual y lo envía |
+| `.github/workflows/reporte-mensual.yml` | Programación del envío |
+| `supabase/functions/enviar-reporte` | Función que activa el envío desde el botón de la app |
 
 ## Flujo de ramas
 
